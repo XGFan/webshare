@@ -6,6 +6,8 @@ steps:
   - name: test
     image: golang:1.26-alpine
     commands:
+      # git needed for Go's -buildvcs stamping; alpine base lacks it.
+      - apk add --no-cache git
       - go vet ./...
       - go test -timeout 3m ./...
 
