@@ -35,8 +35,11 @@ steps:
       - export KUBECONFIG=/tmp/kubeconfig
       # Apply manifest first so new env vars / container ports / the
       # MetalLB LoadBalancer Service for SOCKS5+HTTP are picked up before
-      # the image roll. Idempotent on subsequent builds.
-      - kubectl apply -f deploy/k8s.yaml
+      # the image roll. -n default guards against kubeconfigs whose
+      # default namespace is something other than `default` — resources
+      # in the manifest that omit a namespace would otherwise be created
+      # in the wrong place and Traefik would see two ingresses.
+      - kubectl apply -n default -f deploy/k8s.yaml
       - kubectl set image deployment/webshare webshare=docker.test4x.com/xgfan/webshare:$(echo $CI_COMMIT_SHA | cut -c1-8) -n default
       # Block until the new ReplicaSet is fully rolled out (or fail CI).
       - kubectl rollout status deployment/webshare -n default --timeout=180s
