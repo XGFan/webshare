@@ -181,7 +181,10 @@ label { display: block; font-size: 13px; color: var(--fg-muted); margin-bottom: 
 }
 .tab.active { background: var(--bg-soft); color: var(--fg); }
 .tab:hover:not(.active) { color: var(--fg); }
-.actions { display: flex; gap: 4px; }
+/* Scoped to the topbar — the unscoped `.actions` rule used to bleed onto
+ * <th class="actions"> / <td class="actions"> in the users table,
+ * turning them into flex containers and breaking text-align:right. */
+.topbar .actions { display: flex; gap: 4px; }
 
 main#app { max-width: 1100px; margin: 0 auto; padding: 24px 20px 64px; }
 
