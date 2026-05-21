@@ -73,8 +73,22 @@ button.ghost {
   background: transparent; border-color: transparent;
 }
 button.ghost:hover:not(:disabled) { background: var(--bg-soft); }
-button.icon { padding: 4px 8px; border-color: transparent; background: transparent; }
-button.icon:hover:not(:disabled) { background: var(--bg-soft); }
+button.icon {
+  padding: 0;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-color: transparent; background: transparent;
+  color: var(--fg-muted);
+  border-radius: 6px;
+  font-size: 14px; line-height: 1;
+}
+button.icon:hover:not(:disabled) { background: var(--bg-soft); color: var(--fg); border-color: var(--border); }
+button.icon.danger-icon { color: var(--danger); }
+button.icon.danger-icon:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.1);
+  border-color: rgba(220, 38, 38, 0.3);
+  color: var(--danger);
+}
 
 input, select {
   font: inherit;
@@ -84,8 +98,38 @@ input, select {
   color: var(--fg);
   border-radius: var(--radius);
   min-width: 0;
+  height: 32px;
+  line-height: 1.2;
 }
 input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* Hide native number spinners — they look out-of-place vs custom UI. */
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Replace native <select> chevron with an inline SVG so it matches our look. */
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  select {
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  }
+}
 
 label { display: block; font-size: 13px; color: var(--fg-muted); margin-bottom: 4px; }
 
@@ -208,7 +252,11 @@ section h2 {
 }
 .user-table th, .user-table td { padding: 8px 8px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .user-table th { font-size: 11px; font-weight: 500; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.03em; }
-.user-table td.actions { white-space: nowrap; text-align: right; }
+.user-table th.actions, .user-table td.actions {
+  white-space: nowrap;
+  text-align: right;
+}
+.action-group { display: flex; gap: 2px; align-items: center; justify-content: flex-end; width: 100%; }
 .user-table td .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace; }
 .user-table select { min-width: 180px; }
 .user-table .ok { color: var(--success); }

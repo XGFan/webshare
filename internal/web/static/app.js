@@ -2,8 +2,15 @@
 
 // --- State ---
 
+const TAB_STORAGE_KEY = 'webshare.activeTab';
+
 const state = {
-  tab: 'sources',
+  tab: (() => {
+    try {
+      const saved = localStorage.getItem(TAB_STORAGE_KEY);
+      return saved === 'users' || saved === 'sources' ? saved : 'sources';
+    } catch (_) { return 'sources'; }
+  })(),
   keys: [],
   upstreams: [],
   users: [],
@@ -133,7 +140,7 @@ function systemSection() {
           oninput: (e) => { s.sync_interval_minutes = parseInt(e.target.value || '0', 10); },
         })),
         el('div', { class: 'grow' }),
-        el('button', { onclick: () => applySettings(s) }, 'Apply'),
+        el('button', { class: 'primary', onclick: () => applySettings(s) }, 'Apply'),
       ),
       state.listenerError ? el('div', { class: 'banner error' }, state.listenerError) : null,
     ),
@@ -166,7 +173,7 @@ function renderKeyCard(key) {
         ? el('span', { class: 'timestamp' }, formatRelative(key.last_synced_at))
         : el('span', { class: 'timestamp' }, 'never synced'),
       el('button', { class: 'icon', title: 'Sync', onclick: () => syncKey(key.id) }, '↻'),
-      el('button', { class: 'danger', title: 'Delete', onclick: () => deleteKey(key.id) }, '🗑'),
+      el('button', { class: 'icon danger-icon', title: 'Delete', onclick: () => deleteKey(key.id) }, '✕'),
     ),
     owned.length === 0
       ? el('div', { class: 'empty', style: 'padding:8px' }, 'No upstreams synced yet')
@@ -200,8 +207,6 @@ function renderUsers() {
   const section = el('section', {},
     el('h2', {},
       'Users',
-      el('span', { class: 'muted', style: 'font-size:11px;text-transform:none;font-weight:normal;letter-spacing:0' },
-        'Top 3 appear in the menubar (Mac)'),
       el('span', { style: 'flex:1' }),
       el('button', { class: 'icon', title: 'Add user', onclick: () => openAddUserModal() }, '+'),
     ),
@@ -242,20 +247,22 @@ function renderUsersTable() {
           : el('span', { class: 'ok' }, '✓'),
       ),
       el('td', { class: 'actions' },
-        el('button', {
-          class: 'icon', title: 'Move up',
-          disabled: idx === 0 ? '' : null,
-          onclick: () => moveUser(idx, -1),
-        }, '↑'),
-        el('button', {
-          class: 'icon', title: 'Move down',
-          disabled: idx === state.users.length - 1 ? '' : null,
-          onclick: () => moveUser(idx, +1),
-        }, '↓'),
-        el('button', {
-          class: 'danger', title: 'Delete',
-          onclick: () => deleteUser(user.username),
-        }, '🗑'),
+        el('div', { class: 'action-group' },
+          el('button', {
+            class: 'icon', title: 'Move up',
+            disabled: idx === 0 ? '' : null,
+            onclick: () => moveUser(idx, -1),
+          }, '↑'),
+          el('button', {
+            class: 'icon', title: 'Move down',
+            disabled: idx === state.users.length - 1 ? '' : null,
+            onclick: () => moveUser(idx, +1),
+          }, '↓'),
+          el('button', {
+            class: 'icon danger-icon', title: 'Delete',
+            onclick: () => deleteUser(user.username),
+          }, '✕'),
+        ),
       ),
     );
   }));
@@ -538,6 +545,7 @@ document.getElementById('tabs').addEventListener('click', (e) => {
   const t = e.target.closest('.tab');
   if (!t) return;
   state.tab = t.dataset.tab;
+  try { localStorage.setItem(TAB_STORAGE_KEY, state.tab); } catch (_) {}
   render();
 });
 
