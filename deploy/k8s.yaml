@@ -1,0 +1,149 @@
+# Canonical Kubernetes manifest for the webshare service.
+#
+# Applied by .woodpecker.yaml (kubectl apply -f deploy/k8s.yaml) on every
+# push to master, followed by `kubectl set image` to roll the freshly-built
+# tag onto the Deployment. Edit this file when you need to change ports,
+# env vars, the LoadBalancer Service, ingress, or storage — `set image` only
+# updates the image, never the spec.
+#
+# Mirrored at infra/k8s/webshare/webshare.yaml for cross-repo discoverability;
+# this file is the source of truth (CI applies it).
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: webshare-data
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webshare
+  namespace: default
+  labels:
+    app: webshare
+spec:
+  replicas: 1
+  # SQLite 单写者：升级时先停旧 Pod 再起新 Pod，避免抢占 RWO PVC。
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: webshare
+  template:
+    metadata:
+      labels:
+        app: webshare
+    spec:
+      securityContext:
+        # Container runs as uid 1000 (alpine appuser). Longhorn-provisioned
+        # PVCs default to root ownership; fsGroup retitles the mount so the
+        # non-root process can write master.key / SQLite files into /data.
+        fsGroup: 1000
+      containers:
+        - name: webshare
+          image: docker.test4x.com/xgfan/webshare:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 9090
+            - name: socks5
+              containerPort: 1080
+            - name: httpproxy
+              containerPort: 8080
+          env:
+            - name: WEBSHARE_WEB_PASSWORD
+              value: "password"
+            # 强制代理监听 0.0.0.0，使 MetalLB Service 能转发到 Pod。
+            # 每次启动覆写 DB 中持久化的 bind，Web UI 与实际一致。
+            - name: WEBSHARE_PROXY_BIND
+              value: "0.0.0.0"
+            # Pod 起来后自动开代理；UI 上手动停了之后重启 Pod 仍会再起。
+            - name: WEBSHARE_PROXY_AUTOSTART
+              value: "true"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          livenessProbe:
+            tcpSocket:
+              port: 9090
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: 9090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      imagePullSecrets:
+        - name: regcred
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: webshare-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webshare
+spec:
+  selector:
+    app: webshare
+  ports:
+    - port: 80
+      targetPort: 9090
+---
+# 通过 MetalLB 把 SOCKS5 / HTTP proxy 暴露到 LAN。
+# IP 192.168.2.241 取自 lan-pool (240-250)，不与 Traefik (.231) /
+# 数据库 (.240) 冲突。LAN 客户端用 192.168.2.241:1080 (socks5) 或
+# 192.168.2.241:8080 (http) 接入；UI 仍然走 https://webshare.test4x.com。
+apiVersion: v1
+kind: Service
+metadata:
+  name: webshare-proxy
+  namespace: default
+  annotations:
+    metallb.io/loadBalancerIPs: 192.168.2.241
+spec:
+  type: LoadBalancer
+  selector:
+    app: webshare
+  ports:
+    - name: socks5
+      protocol: TCP
+      port: 1080
+      targetPort: 1080
+    - name: httpproxy
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: webshare
+  annotations:
+    cert-manager.io/cluster-issuer: cf-dns-issuer
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - webshare.test4x.com
+      secretName: wildcard-test4x-com-tls
+  rules:
+    - host: webshare.test4x.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: webshare
+                port:
+                  number: 80

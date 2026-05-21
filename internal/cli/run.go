@@ -60,6 +60,20 @@ func runDaemon(ctx context.Context, deps Deps, args []string) int {
 		fmt.Fprintf(deps.Stderr, "settings: %v\n", err)
 		return 1
 	}
+	// Env-var overrides for declarative deployments (K8s, systemd). When
+	// set, they win over the persisted values and are written back to the
+	// DB so the web UI reflects the actual listener state.
+	if v := os.Getenv("WEBSHARE_PROXY_BIND"); v != "" {
+		settings.HTTPListenerBind = v
+		settings.SOCKS5ListenerBind = v
+	}
+	if v := os.Getenv("WEBSHARE_PROXY_AUTOSTART"); v == "true" || v == "1" {
+		settings.ProxyEnabled = true
+	}
+	if err := repo.UpdateSettings(ctx, db, settings); err != nil {
+		fmt.Fprintf(deps.Stderr, "settings persist: %v\n", err)
+		return 1
+	}
 	core := routing.NewCore(db, masterKey)
 	if err := core.Hydrate(ctx); err != nil {
 		fmt.Fprintf(deps.Stderr, "hydrate: %v\n", err)
