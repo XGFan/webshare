@@ -232,6 +232,40 @@ func TestLoginAndAssets_UnauthOK(t *testing.T) {
 	}
 }
 
+func TestFaviconServedAndLinked(t *testing.T) {
+	srv := newTestServer(t, "secret")
+	h := srv.handler()
+
+	// Favicon must be reachable without auth — the login page references it.
+	req := httptest.NewRequest("GET", "/assets/favicon.png", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("/assets/favicon.png: expected 200, got %d", rec.Code)
+	}
+	if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "image/png") {
+		t.Errorf("/assets/favicon.png: expected image/png, got %q", ct)
+	}
+
+	// login.html links the favicon (unauth).
+	req = httptest.NewRequest("GET", "/login", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if !strings.Contains(rec.Body.String(), `href="/assets/favicon.png"`) {
+		t.Error("login.html does not link favicon")
+	}
+
+	// index.html (served at /app behind auth) links the favicon too.
+	cookie := loginAndCookie(t, h, "secret")
+	req = httptest.NewRequest("GET", "/app", nil)
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if !strings.Contains(rec.Body.String(), `href="/assets/favicon.png"`) {
+		t.Error("index.html does not link favicon")
+	}
+}
+
 func TestNew_ValidatesOptions(t *testing.T) {
 	cases := []struct {
 		name string
